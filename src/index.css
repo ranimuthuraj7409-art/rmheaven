@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Playfair Display', 'Manrope', serif;
+  --font-mono: 'Space Mono', monospace;
+
+  /* Luxury Light Academic Color System - Strictly NO BLUE */
+  --color-pure-white: #FFFFFF;
+  --color-warm-white: #FCFAF8;
+  --color-cream: #F8F3EE;
+  --color-beige: #F1E8DC;
+  --color-rose-soft: #EAD5D8;
+  --color-burgundy: #800020;
+  --color-burgundy-dark: #630018;
+  --color-burgundy-light: #9B0E30;
+  --color-maroon: #702D3D;
+  --color-maroon-hover: #592330;
+  --color-gold: #D6B878;
+  --color-gold-light: #E8D4A6;
+  --color-gold-dark: #B89752;
+  --color-charcoal: #393333;
+  --color-secondary: #817779;
+  --color-academic-border: #EAE1DD;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #FCFAF8;
+  color: #393333;
+}
+
+h1, h2, h3, h4, .font-heading {
+  font-family: var(--font-heading);
+}
+
+/* Subtle luxury scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F8F3EE;
+}
+::-webkit-scrollbar-thumb {
+  background: #EAE1DD;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D6B878;
+}

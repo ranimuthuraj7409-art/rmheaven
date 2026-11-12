@@ -1,0 +1,6 @@
+{
+  "name": "RM Heaven - Dynamic Internship & LMS Platform",
+  "description": "RM Heaven is a prestigious dynamic academic internship and learning management platform with protected course notes, student enrollment approval, assignments, and governance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
