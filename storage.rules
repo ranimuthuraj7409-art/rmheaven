@@ -1,0 +1,50 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'ranimuthuraj7409@gmail.com' ||
+        firestore.exists(/databases/ai-studio-575d9b61-516c-4484-93c8-07c439fdcb2c/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isEnrolled(courseId) {
+      return isVerified() &&
+        firestore.exists(/databases/ai-studio-575d9b61-516c-4484-93c8-07c439fdcb2c/documents/student_enrollments/$(request.auth.uid + '_' + courseId)) &&
+        firestore.get(/databases/ai-studio-575d9b61-516c-4484-93c8-07c439fdcb2c/documents/student_enrollments/$(request.auth.uid + '_' + courseId)).data.status == 'active';
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Public course and internship thumbnails
+    match /public/thumbnails/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Restricted course learning materials (PDFs & documents)
+    match /courses/{courseId}/materials/{fileName} {
+      allow read: if isAdmin() || isEnrolled(courseId);
+      allow write: if isAdmin() && request.resource.size <= 25 * 1024 * 1024;
+    }
+
+    // Student assignment submissions
+    match /assignments/{courseId}/{assignmentId}/{studentId}/{fileName} {
+      allow read: if isAdmin() || (isVerified() && request.auth.uid == studentId);
+      allow write: if isVerified() && request.auth.uid == studentId && isEnrolled(courseId) &&
+        request.resource.size <= 20 * 1024 * 1024;
+    }
+  }
+}

@@ -1,0 +1,784 @@
+{
+  "entities": {
+    "Department": {
+      "title": "Department",
+      "description": "Academic department organizing RM HEAVEN courses.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "slug": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "description": { "type": "string", "minLength": 5, "maxLength": 1200 },
+        "orderIndex": { "type": "integer" },
+        "status": { "type": "string", "enum": ["active", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "slug", "name", "description", "orderIndex", "status", "createdAt", "updatedAt"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Trusted administrator account record controlling elevated portal privileges.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin"] },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "fullName", "role", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Student profile, academic metadata, account status, and legal consent acceptance record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "mobile": { "type": "string", "minLength": 7, "maxLength": 24 },
+        "qualification": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "institution": { "type": "string", "maxLength": 180 },
+        "city": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "courseInterests": { "type": "array" },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "accountStatus": { "type": "string", "enum": ["active", "suspended"] },
+        "termsAccepted": { "type": "boolean" },
+        "termsVersion": { "type": "string", "maxLength": 32 },
+        "conductAccepted": { "type": "boolean" },
+        "conductVersion": { "type": "string", "maxLength": 32 },
+        "acceptedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "uid",
+        "fullName",
+        "email",
+        "mobile",
+        "qualification",
+        "city",
+        "role",
+        "accountStatus",
+        "termsAccepted",
+        "termsVersion",
+        "conductAccepted",
+        "conductVersion",
+        "acceptedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Dynamic EdTech course catalog entry managed by RM HEAVEN administrators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "departmentId": { "type": "string", "maxLength": 128 },
+        "departmentName": { "type": "string", "maxLength": 140 },
+        "category": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "level": { "type": "string", "enum": ["Beginner", "Intermediate", "Advanced", "Executive"] },
+        "duration": { "type": "string", "minLength": 2, "maxLength": 64 },
+        "shortDescription": { "type": "string", "minLength": 10, "maxLength": 320 },
+        "fullDescription": { "type": "string", "minLength": 10, "maxLength": 4000 },
+        "introduction": { "type": "string", "maxLength": 3000 },
+        "objectives": { "type": "array" },
+        "targetAudience": { "type": "string", "maxLength": 1000 },
+        "prerequisites": { "type": "string", "maxLength": 1000 },
+        "syllabusSummary": { "type": "array" },
+        "moduleAssessments": { "type": "array" },
+        "finalAssessmentTitle": { "type": "string", "maxLength": 300 },
+        "thumbnailUrl": { "type": "string", "maxLength": 500 },
+        "outcomes": { "type": "array" },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "title",
+        "category",
+        "level",
+        "duration",
+        "shortDescription",
+        "fullDescription",
+        "status",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CourseModule": {
+      "title": "CourseModule",
+      "description": "Structured curriculum module within a course.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "assessmentTitle": { "type": "string", "maxLength": 200 },
+        "assessmentCriteria": { "type": "string", "maxLength": 1000 },
+        "orderIndex": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "courseId", "title", "orderIndex", "createdAt", "updatedAt"]
+    },
+    "CourseLesson": {
+      "title": "CourseLesson",
+      "description": "Restricted lesson content accessible only to enrolled students and administrators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "summary": { "type": "string", "maxLength": 500 },
+        "objectives": { "type": "array" },
+        "contentBody": { "type": "string", "maxLength": 20000 },
+        "examples": { "type": "string", "maxLength": 10000 },
+        "exercisePrompt": { "type": "string", "maxLength": 4000 },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "durationMinutes": { "type": "integer" },
+        "orderIndex": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "courseId", "moduleId", "title", "contentBody", "orderIndex", "createdAt", "updatedAt"]
+    },
+    "StudyNote": {
+      "title": "StudyNote",
+      "description": "Structured 11-section official study note assigned to a course, module, and optional lesson.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "lessonId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 3, "maxLength": 180 },
+        "sourceType": { "type": "string", "enum": ["official", "ai_assisted_admin"] },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "topicIntroduction": { "type": "string", "minLength": 10, "maxLength": 3000 },
+        "simpleExplanation": { "type": "string", "minLength": 10, "maxLength": 4000 },
+        "detailedExplanation": { "type": "string", "minLength": 10, "maxLength": 8000 },
+        "keyConcepts": { "type": "string", "minLength": 10, "maxLength": 6000 },
+        "stepByStepExplanation": { "type": "string", "minLength": 10, "maxLength": 6000 },
+        "practicalExamples": { "type": "string", "minLength": 10, "maxLength": 8000 },
+        "realWorldApplications": { "type": "string", "minLength": 10, "maxLength": 4000 },
+        "importantPoints": { "type": "string", "minLength": 10, "maxLength": 4000 },
+        "commonMistakes": { "type": "string", "minLength": 10, "maxLength": 4000 },
+        "summary": { "type": "string", "minLength": 10, "maxLength": 3000 },
+        "practiceQuestions": { "type": "string", "minLength": 10, "maxLength": 8000 },
+        "domainSupplement": { "type": "string", "maxLength": 6000 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "courseId",
+        "moduleId",
+        "title",
+        "sourceType",
+        "status",
+        "topicIntroduction",
+        "simpleExplanation",
+        "detailedExplanation",
+        "keyConcepts",
+        "stepByStepExplanation",
+        "practicalExamples",
+        "realWorldApplications",
+        "importantPoints",
+        "commonMistakes",
+        "summary",
+        "practiceQuestions",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LearningMaterial": {
+      "title": "LearningMaterial",
+      "description": "Restricted PDF notes and downloadable resources gated by course enrollment and admin download permissions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "lessonId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "fileUrl": { "type": "string", "minLength": 5, "maxLength": 1000 },
+        "fileName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "fileType": { "type": "string", "maxLength": 80 },
+        "downloadAllowed": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "draft", "archived"] },
+        "uploadedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "courseId",
+        "moduleId",
+        "title",
+        "description",
+        "fileUrl",
+        "fileName",
+        "downloadAllowed",
+        "status",
+        "uploadedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "Course module quiz or final assessment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleId": { "type": "string", "maxLength": 128 },
+        "quizType": { "type": "string", "enum": ["module", "final", "practice"] },
+        "title": { "type": "string", "minLength": 2, "maxLength": 180 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "passingPercent": { "type": "integer" },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "questionCount": { "type": "integer" },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "courseId",
+        "quizType",
+        "title",
+        "description",
+        "passingPercent",
+        "status",
+        "questionCount",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "QuizQuestion": {
+      "title": "QuizQuestion",
+      "description": "Multiple-choice question belonging to a course quiz.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "quizId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "questionText": { "type": "string", "minLength": 5, "maxLength": 1000 },
+        "options": { "type": "array" },
+        "correctIndex": { "type": "integer" },
+        "explanation": { "type": "string", "minLength": 5, "maxLength": 1500 },
+        "topicTag": { "type": "string", "maxLength": 120 },
+        "orderIndex": { "type": "integer" }
+      },
+      "required": ["id", "courseId", "quizId", "questionText", "options", "correctIndex", "explanation", "orderIndex"]
+    },
+    "QuizAttempt": {
+      "title": "QuizAttempt",
+      "description": "Student quiz or AI practice assessment attempt and weak-topic diagnosis.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "quizId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "quizTitle": { "type": "string", "minLength": 2, "maxLength": 180 },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "moduleId": { "type": "string", "maxLength": 128 },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "studentEmail": { "type": "string", "format": "email", "maxLength": 160 },
+        "scorePercent": { "type": "integer" },
+        "correctCount": { "type": "integer" },
+        "totalQuestions": { "type": "integer" },
+        "weakTopics": { "type": "array" },
+        "answersJson": { "type": "string", "maxLength": 10000 },
+        "source": { "type": "string", "enum": ["course_quiz", "ai_practice"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "quizId",
+        "quizTitle",
+        "courseId",
+        "studentId",
+        "studentName",
+        "studentEmail",
+        "scorePercent",
+        "correctCount",
+        "totalQuestions",
+        "weakTopics",
+        "answersJson",
+        "source",
+        "createdAt"
+      ]
+    },
+    "SavedAiNote": {
+      "title": "SavedAiNote",
+      "description": "Personal AI-generated study note saved by a student, clearly tagged as AI-generated.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseTitle": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "lessonId": { "type": "string", "maxLength": 128 },
+        "lessonTitle": { "type": "string", "maxLength": 180 },
+        "noteMode": {
+          "type": "string",
+          "enum": ["simple", "detailed", "short_revision", "step_by_step", "practice_questions", "translation", "tutor_saved"]
+        },
+        "language": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "title": { "type": "string", "minLength": 2, "maxLength": 180 },
+        "content": { "type": "string", "minLength": 10, "maxLength": 25000 },
+        "isAiGenerated": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "courseId",
+        "courseTitle",
+        "noteMode",
+        "language",
+        "title",
+        "content",
+        "isAiGenerated",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AiTutorSession": {
+      "title": "AiTutorSession",
+      "description": "Private student conversation session with RM HEAVEN AI Tutor scoped to a course.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 3, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "lessonId": { "type": "string", "maxLength": 128 },
+        "language": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "mode": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "messagesJson": { "type": "string", "maxLength": 45000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "studentId", "courseId", "language", "mode", "messagesJson", "createdAt", "updatedAt"]
+    },
+    "EnrollmentRequest": {
+      "title": "EnrollmentRequest",
+      "description": "Student request to enroll in a course, subject to explicit admin approval.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "studentEmail": { "type": "string", "format": "email", "maxLength": 160 },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseTitle": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "note": { "type": "string", "maxLength": 600 },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected", "Cancelled"] },
+        "adminFeedback": { "type": "string", "maxLength": 1000 },
+        "reviewedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "studentName",
+        "studentEmail",
+        "courseId",
+        "courseTitle",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudentEnrollment": {
+      "title": "StudentEnrollment",
+      "description": "Authoritative enrollment grant and course progress record written upon admin approval.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseTitle": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "status": { "type": "string", "enum": ["active", "revoked", "completed"] },
+        "completedLessonIds": { "type": "array" },
+        "progressPercent": { "type": "integer" },
+        "approvedBy": { "type": "string", "maxLength": 128 },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "courseId",
+        "courseTitle",
+        "status",
+        "completedLessonIds",
+        "progressPercent",
+        "approvedBy",
+        "approvedAt",
+        "updatedAt"
+      ]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Course assignment published by administrators for enrolled students.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseTitle": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "title": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "instructions": { "type": "string", "minLength": 5, "maxLength": 5000 },
+        "dueDate": { "type": "string", "maxLength": 40 },
+        "maxMarks": { "type": "integer" },
+        "status": { "type": "string", "enum": ["published", "closed"] },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "courseId", "courseTitle", "title", "instructions", "dueDate", "maxMarks", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "AssignmentSubmission": {
+      "title": "AssignmentSubmission",
+      "description": "Student assignment submission and admin evaluation record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "assignmentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "courseId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "assignmentTitle": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "studentEmail": { "type": "string", "format": "email", "maxLength": 160 },
+        "fileUrl": { "type": "string", "maxLength": 1000 },
+        "fileName": { "type": "string", "maxLength": 200 },
+        "notes": { "type": "string", "maxLength": 3000 },
+        "status": { "type": "string", "enum": ["Submitted", "Under Review", "Evaluated"] },
+        "marks": { "type": "number" },
+        "feedback": { "type": "string", "maxLength": 2000 },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "evaluatedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "assignmentId",
+        "courseId",
+        "assignmentTitle",
+        "studentId",
+        "studentName",
+        "studentEmail",
+        "status",
+        "submittedAt",
+        "updatedAt"
+      ]
+    },
+    "Internship": {
+      "title": "Internship",
+      "description": "Internship programme listing managed by administrators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "department": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "description": { "type": "string", "minLength": 10, "maxLength": 4000 },
+        "eligibility": { "type": "string", "minLength": 5, "maxLength": 1000 },
+        "skillsRequired": { "type": "array" },
+        "duration": { "type": "string", "minLength": 2, "maxLength": 64 },
+        "learningOutcomes": { "type": "array" },
+        "deadline": { "type": "string", "maxLength": 40 },
+        "thumbnailUrl": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["open", "closed", "archived"] },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "title",
+        "department",
+        "description",
+        "eligibility",
+        "skillsRequired",
+        "duration",
+        "learningOutcomes",
+        "deadline",
+        "status",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "InternshipApplication": {
+      "title": "InternshipApplication",
+      "description": "Student application for an RM HEAVEN internship programme.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "internshipId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "internshipTitle": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "studentEmail": { "type": "string", "format": "email", "maxLength": 160 },
+        "mobile": { "type": "string", "maxLength": 24 },
+        "qualification": { "type": "string", "maxLength": 120 },
+        "statementOfPurpose": { "type": "string", "minLength": 10, "maxLength": 3000 },
+        "portfolioUrl": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["Applied", "Under Review", "Accepted", "Rejected", "Completed"] },
+        "adminFeedback": { "type": "string", "maxLength": 1000 },
+        "appliedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "internshipId",
+        "internshipTitle",
+        "studentId",
+        "studentName",
+        "studentEmail",
+        "statementOfPurpose",
+        "status",
+        "appliedAt",
+        "updatedAt"
+      ]
+    },
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Issued completion certificate record for a student.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "certificateCode": { "type": "string", "minLength": 6, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "studentEmail": { "type": "string", "format": "email", "maxLength": 160 },
+        "programId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "programTitle": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "programType": { "type": "string", "enum": ["Course", "Internship"] },
+        "downloadAllowed": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["Valid", "Revoked"] },
+        "issuedBy": { "type": "string", "maxLength": 128 },
+        "issuedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "certificateCode",
+        "studentId",
+        "studentName",
+        "studentEmail",
+        "programId",
+        "programTitle",
+        "programType",
+        "downloadAllowed",
+        "status",
+        "issuedBy",
+        "issuedAt",
+        "updatedAt"
+      ]
+    },
+    "CertificateVerification": {
+      "title": "CertificateVerification",
+      "description": "Public non-PII certificate verification lookup record keyed by certificateCode.",
+      "type": "object",
+      "properties": {
+        "certificateCode": { "type": "string", "minLength": 6, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "programTitle": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "programType": { "type": "string", "enum": ["Course", "Internship"] },
+        "status": { "type": "string", "enum": ["Valid", "Revoked"] },
+        "issuedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["certificateCode", "recipientName", "programTitle", "programType", "status", "issuedAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification targeted to an individual student or to administrators.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "recipientRole": { "type": "string", "enum": ["student", "admin"] },
+        "title": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "message": { "type": "string", "minLength": 2, "maxLength": 600 },
+        "type": { "type": "string", "enum": ["enrollment", "course", "assignment", "internship", "certificate", "registration", "system"] },
+        "linkPath": { "type": "string", "maxLength": 200 },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "recipientId", "recipientRole", "title", "message", "type", "read", "createdAt"]
+    },
+    "WebsiteContent": {
+      "title": "WebsiteContent",
+      "description": "CMS-editable public website copy, announcements, and contact configuration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "heroHeadline": { "type": "string", "maxLength": 180 },
+        "heroSubtext": { "type": "string", "maxLength": 600 },
+        "welcomeTitle": { "type": "string", "maxLength": 160 },
+        "welcomeBody": { "type": "string", "maxLength": 2000 },
+        "announcementBanner": { "type": "string", "maxLength": 400 },
+        "contactEmail": { "type": "string", "maxLength": 160 },
+        "contactPhone": { "type": "string", "maxLength": 40 },
+        "officeLocation": { "type": "string", "maxLength": 240 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "updatedAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Contact inquiry or authenticated student support request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "subject": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "message": { "type": "string", "minLength": 5, "maxLength": 3000 },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Resolved"] },
+        "adminReply": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "subject", "message", "status", "createdAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable administrative audit trail entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorEmail": { "type": "string", "format": "email", "maxLength": 160 },
+        "action": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "targetType": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "actorId", "actorEmail", "action", "targetType", "targetId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/departments/{departmentId}": {
+      "schema": { "$ref": "#/entities/Department" },
+      "description": "Academic departments organizing RM HEAVEN courses."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Trusted administrator directory."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Student user profiles and legal consent records."
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "Published and draft courses."
+    },
+    "/courses/{courseId}/modules/{moduleId}": {
+      "schema": { "$ref": "#/entities/CourseModule" },
+      "description": "Modules belonging to a parent course."
+    },
+    "/courses/{courseId}/lessons/{lessonId}": {
+      "schema": { "$ref": "#/entities/CourseLesson" },
+      "description": "Restricted lessons accessible only to enrolled students and admins."
+    },
+    "/courses/{courseId}/study_notes/{noteId}": {
+      "schema": { "$ref": "#/entities/StudyNote" },
+      "description": "Structured 11-section official study notes accessible only to enrolled students and admins."
+    },
+    "/courses/{courseId}/materials/{materialId}": {
+      "schema": { "$ref": "#/entities/LearningMaterial" },
+      "description": "Restricted PDFs and study materials accessible only to enrolled students and admins."
+    },
+    "/courses/{courseId}/quizzes/{quizId}": {
+      "schema": { "$ref": "#/entities/Quiz" },
+      "description": "Course module quizzes and final assessments."
+    },
+    "/courses/{courseId}/quizzes/{quizId}/questions/{questionId}": {
+      "schema": { "$ref": "#/entities/QuizQuestion" },
+      "description": "Quiz multiple-choice questions and explanations."
+    },
+    "/courses/{courseId}/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/Assignment" },
+      "description": "Course assignments accessible only to enrolled students and admins."
+    },
+    "/quiz_attempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/QuizAttempt" },
+      "description": "Student quiz and AI practice test attempts with weak-topic analytics."
+    },
+    "/saved_ai_notes/{noteId}": {
+      "schema": { "$ref": "#/entities/SavedAiNote" },
+      "description": "Personal AI-generated study notes saved by enrolled students."
+    },
+    "/ai_tutor_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/AiTutorSession" },
+      "description": "Authorized student AI Tutor conversation sessions keyed as {studentId}_{courseId}."
+    },
+    "/enrollment_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/EnrollmentRequest" },
+      "description": "Course enrollment requests awaiting or resolved by admin approval."
+    },
+    "/student_enrollments/{enrollmentId}": {
+      "schema": { "$ref": "#/entities/StudentEnrollment" },
+      "description": "Authoritative enrollment and course progress records keyed as {studentId}_{courseId}."
+    },
+    "/assignment_submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/AssignmentSubmission" },
+      "description": "Assignment submissions and admin evaluations keyed as {assignmentId}_{studentId}."
+    },
+    "/internships/{internshipId}": {
+      "schema": { "$ref": "#/entities/Internship" },
+      "description": "Internship programmes managed by admins."
+    },
+    "/internship_applications/{applicationId}": {
+      "schema": { "$ref": "#/entities/InternshipApplication" },
+      "description": "Student internship applications keyed as {internshipId}_{studentId}."
+    },
+    "/certificates/{certificateId}": {
+      "schema": { "$ref": "#/entities/Certificate" },
+      "description": "Issued student certificates."
+    },
+    "/certificate_verifications/{certificateCode}": {
+      "schema": { "$ref": "#/entities/CertificateVerification" },
+      "description": "Public non-PII certificate verification lookup records."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "In-app notifications for students and administrators."
+    },
+    "/website_content/{docId}": {
+      "schema": { "$ref": "#/entities/WebsiteContent" },
+      "description": "Dynamic public website content managed by admins."
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Contact inquiries and student support tickets."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable administrative audit logs."
+    }
+  }
+}
