@@ -18,6 +18,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { auth } from '../firebase/config';
+import { fetchApiJson } from '../utils/apiClient';
 import { RmHeavenWordmark } from './BrandAssets';
 import {
   clearAiTutorSession,
@@ -315,7 +316,7 @@ export function RmHeavenAiTutor({
 
     try {
       const headers = await getAuthHeaders();
-      const resp = await fetch('/api/tutor/chat', {
+      const data = await fetchApiJson<{ reply?: string; error?: string }>('/api/tutor/chat', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -334,8 +335,7 @@ export function RmHeavenAiTutor({
           history: updatedHistory.slice(-10).map((m) => ({ role: m.role, text: m.text })),
         }),
       });
-      const data = (await resp.json()) as { reply?: string; error?: string };
-      if (!resp.ok || !data.reply) {
+      if (!data.reply) {
         throw new Error(data.error || 'Unable to receive reply from RM HEAVEN AI Tutor.');
       }
 
@@ -415,7 +415,13 @@ export function RmHeavenAiTutor({
     setNoteSavedSuccess(false);
     try {
       const headers = await getAuthHeaders();
-      const resp = await fetch('/api/tutor/generate-notes', {
+      const data = await fetchApiJson<{
+        title?: string;
+        content?: string;
+        noteMode?: SavedAiNoteMode;
+        language?: string;
+        error?: string;
+      }>('/api/tutor/generate-notes', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -431,14 +437,7 @@ export function RmHeavenAiTutor({
           customTopic: noteFocus,
         }),
       });
-      const data = (await resp.json()) as {
-        title?: string;
-        content?: string;
-        noteMode?: SavedAiNoteMode;
-        language?: string;
-        error?: string;
-      };
-      if (!resp.ok || !data.content) {
+      if (!data.content) {
         throw new Error(data.error || 'Failed to generate personal study note.');
       }
       setGeneratedNote({
@@ -482,19 +481,21 @@ export function RmHeavenAiTutor({
     setPdfSavedSuccess(false);
     try {
       const headers = await getAuthHeaders();
-      const resp = await fetch('/api/tutor/explain-pdf', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          courseId: course.id,
-          materialId: selectedMaterialId,
-          action: pdfAction,
-          language: effectiveLanguage,
-          sectionHint: pdfSectionHint,
-        }),
-      });
-      const data = (await resp.json()) as { explanation?: string; materialTitle?: string; language?: string; error?: string };
-      if (!resp.ok || !data.explanation) {
+      const data = await fetchApiJson<{ explanation?: string; materialTitle?: string; language?: string; error?: string }>(
+        '/api/tutor/explain-pdf',
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            courseId: course.id,
+            materialId: selectedMaterialId,
+            action: pdfAction,
+            language: effectiveLanguage,
+            sectionHint: pdfSectionHint,
+          }),
+        },
+      );
+      if (!data.explanation) {
         throw new Error(data.error || 'Unable to explain document.');
       }
       setPdfExplanation({
@@ -520,7 +521,7 @@ export function RmHeavenAiTutor({
     setQuizWeakTopics([]);
     try {
       const headers = await getAuthHeaders();
-      const resp = await fetch('/api/tutor/practice-quiz', {
+      const data = await fetchApiJson<{ questions?: PracticeQuestionItem[]; error?: string }>('/api/tutor/practice-quiz', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -536,8 +537,7 @@ export function RmHeavenAiTutor({
           questionCount: quizCount,
         }),
       });
-      const data = (await resp.json()) as { questions?: PracticeQuestionItem[]; error?: string };
-      if (!resp.ok || !data.questions || data.questions.length === 0) {
+      if (!data.questions || data.questions.length === 0) {
         throw new Error(data.error || 'Could not generate interactive practice questions.');
       }
       setPracticeQuestions(data.questions);

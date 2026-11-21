@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import http from 'http';
-import express, { type Request, type Response } from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -90,12 +90,19 @@ interface FirestoreRestDoc {
 
 async function fetchFirestoreDocWithToken(docPath: string, idToken: string): Promise<FirestoreRestDoc | null> {
   if (!firebaseCfg) return null;
-  const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseCfg.projectId)}/databases/${encodeURIComponent(firebaseCfg.firestoreDatabaseId)}/documents/${docPath}`;
-  const resp = await fetch(url, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  });
-  if (!resp.ok) return null;
-  return (await resp.json()) as FirestoreRestDoc;
+  try {
+    const url = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(firebaseCfg.projectId)}/databases/${encodeURIComponent(firebaseCfg.firestoreDatabaseId)}/documents/${docPath}`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${idToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) return null;
+    const raw = await resp.text();
+    if (!raw.trim()) return null;
+    return JSON.parse(raw) as FirestoreRestDoc;
+  } catch {
+    return null;
+  }
 }
 
 async function verifyCaller(
@@ -117,23 +124,40 @@ async function verifyCaller(
   const idToken = match[1].trim();
 
   // Verify signature, expiry, and claims via Firebase Identity Toolkit REST endpoint
-  const lookupResp = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseCfg.apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    },
-  );
+  let lookupResp: globalThis.Response;
+  let lookupRaw = '';
+  try {
+    lookupResp = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseCfg.apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    lookupRaw = await lookupResp.text();
+  } catch {
+    res.status(502).json({ error: 'Unable to reach authentication verification service. Please try again.' });
+    return null;
+  }
 
   if (!lookupResp.ok) {
     res.status(401).json({ error: 'Your session token is expired or invalid. Please sign in again.' });
     return null;
   }
 
-  const lookupJson = (await lookupResp.json()) as {
+  let lookupJson: {
     users?: Array<{ localId?: string; email?: string; emailVerified?: boolean; disabled?: boolean }>;
   };
+  try {
+    lookupJson = JSON.parse(lookupRaw) as {
+      users?: Array<{ localId?: string; email?: string; emailVerified?: boolean; disabled?: boolean }>;
+    };
+  } catch {
+    res.status(502).json({ error: 'Authentication verification service returned an unexpected response.' });
+    return null;
+  }
   const userRec = lookupJson.users?.[0];
   if (!userRec?.localId || !userRec.email || userRec.disabled) {
     res.status(401).json({ error: 'Unable to verify user identity.' });
@@ -223,6 +247,132 @@ function buildDepartmentConstraint(departmentName?: string, courseTitle?: string
   return '';
 }
 
+class GeminiApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+type GeminiGenerateResponse = Awaited<ReturnType<InstanceType<typeof GoogleGenAI>['models']['generateContent']>>;
+
+const BLOCKED_FINISH_REASONS = new Set([
+  'SAFETY',
+  'RECITATION',
+  'PROHIBITED_CONTENT',
+  'BLOCKLIST',
+  'SPII',
+  'IMAGE_SAFETY',
+]);
+
+function stripJsonCodeFences(raw: string): string {
+  const trimmed = raw.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenced ? fenced[1].trim() : trimmed;
+}
+
+function getFinishReason(response: GeminiGenerateResponse): string {
+  return String(response.candidates?.[0]?.finishReason || '');
+}
+
+function ensureGeminiTextOrThrow(response: GeminiGenerateResponse, emptyFallback: string): string {
+  const finishReason = getFinishReason(response);
+  if (BLOCKED_FINISH_REASONS.has(finishReason)) {
+    throw new GeminiApiError(
+      422,
+      'The AI model filtered this output due to content safety policies. Please rephrase your topic focus.',
+    );
+  }
+  const text = (response.text || '').trim();
+  if (!text) {
+    if (finishReason === 'MAX_TOKENS') {
+      throw new GeminiApiError(
+        422,
+        'The AI response exceeded the output token limit before producing text. Try selecting a shorter sub-topic.',
+      );
+    }
+    throw new GeminiApiError(422, emptyFallback);
+  }
+  return text;
+}
+
+function extractGeminiJsonOrThrow<T>(response: GeminiGenerateResponse, emptyFallback: string): T {
+  const finishReason = getFinishReason(response);
+  if (BLOCKED_FINISH_REASONS.has(finishReason)) {
+    throw new GeminiApiError(
+      422,
+      'The AI model filtered this output due to content safety policies. Please rephrase your topic focus.',
+    );
+  }
+  const rawText = (response.text || '').trim();
+  if (!rawText) {
+    if (finishReason === 'MAX_TOKENS') {
+      throw new GeminiApiError(
+        422,
+        'The generated output exceeded the token limit. Please try a shorter sub-topic or Short Revision format.',
+      );
+    }
+    throw new GeminiApiError(422, emptyFallback);
+  }
+  const cleaned = stripJsonCodeFences(rawText);
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch {
+    if (finishReason === 'MAX_TOKENS') {
+      throw new GeminiApiError(
+        422,
+        'The generated study note was cut off at the maximum token limit. Try narrowing the sub-topic focus or choosing Short Revision.',
+      );
+    }
+    throw new GeminiApiError(422, 'The AI model returned an invalid structured response. Please try again.');
+  }
+}
+
+function handleRouteError(res: Response, err: unknown, fallbackMessage: string): void {
+  if (res.headersSent) return;
+  if (err instanceof GeminiApiError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
+
+  const candidate = err as { status?: number; code?: number; message?: string; name?: string };
+  const statusCode =
+    typeof candidate?.status === 'number' && candidate.status >= 400 && candidate.status < 600
+      ? candidate.status
+      : typeof candidate?.code === 'number' && candidate.code >= 400 && candidate.code < 600
+        ? candidate.code
+        : 500;
+  const rawMessage = candidate?.message || (err instanceof Error ? err.message : fallbackMessage);
+
+  if (statusCode === 429 || /rate limit|quota|resource_exhausted/i.test(rawMessage)) {
+    res.status(429).json({
+      error: 'AI generation quota or rate limit was temporarily reached. Please wait a moment and try again.',
+    });
+    return;
+  }
+  if (statusCode === 401 || statusCode === 403 || /api key|permission_denied|unauthenticated/i.test(rawMessage)) {
+    res.status(502).json({
+      error: 'AI service authentication failed on the server. Please verify the Gemini API key configuration.',
+    });
+    return;
+  }
+  if (statusCode === 408 || statusCode === 504 || candidate?.name === 'AbortError' || /timeout|timed out/i.test(rawMessage)) {
+    res.status(504).json({
+      error: 'The AI request timed out while generating content. Please try again with a more focused topic.',
+    });
+    return;
+  }
+  if (rawMessage.trim().startsWith('<') || /unexpected token/i.test(rawMessage)) {
+    res.status(502).json({ error: fallbackMessage });
+    return;
+  }
+
+  res.status(statusCode >= 400 && statusCode < 600 ? statusCode : 500).json({
+    error: rawMessage || fallbackMessage,
+  });
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'rm-heaven' });
 });
@@ -285,15 +435,17 @@ app.post('/api/assistant/chat', async (req, res) => {
     const response = await ai.models.generateContent({
       model: AI_MODEL,
       contents,
-      config: { systemInstruction },
+      config: { systemInstruction, maxOutputTokens: 4096 },
     });
 
-    res.json({
-      reply: response.text ?? 'I could not generate a response for that prompt. Please rephrase your question.',
-    });
+    const reply = ensureGeminiTextOrThrow(
+      response,
+      'I could not generate a response for that prompt. Please rephrase your question.',
+    );
+
+    res.json({ reply });
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unable to reach AI Tutor.';
-    res.status(500).json({ error: errorMessage });
+    handleRouteError(res, err, 'Unable to reach AI Tutor.');
   }
 });
 
@@ -399,17 +551,21 @@ app.post('/api/tutor/chat', async (req, res) => {
     const response = await ai.models.generateContent({
       model: AI_MODEL,
       contents,
-      config: { systemInstruction },
+      config: { systemInstruction, maxOutputTokens: 4096 },
     });
 
+    const reply = ensureGeminiTextOrThrow(
+      response,
+      'No response was generated for this topic. Please try rephrasing your question.',
+    );
+
     res.json({
-      reply: response.text ?? 'No response generated. Please try rephrasing your question.',
+      reply,
       mode: activeMode,
       language: targetLanguage,
     });
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unable to generate AI Tutor reply.';
-    res.status(500).json({ error: errorMessage });
+    handleRouteError(res, err, 'Unable to generate AI Tutor reply.');
   }
 });
 
@@ -487,11 +643,29 @@ app.post('/api/tutor/generate-notes', async (req, res) => {
       contents: prompt,
       config: {
         systemInstruction:
-          'You generate personalized AI study notes for RM HEAVEN students. Clearly structure notes for personal revision. Never fabricate external grades or policies.',
+          'You generate personalized AI study notes for RM HEAVEN students. Return valid JSON matching the schema, with Markdown-formatted study note body inside the content field. Never fabricate external grades or policies.',
+        responseMimeType: 'application/json',
+        maxOutputTokens: 8192,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            content: { type: Type.STRING },
+          },
+          required: ['title', 'content'],
+        },
       },
     });
 
-    const content = response.text?.trim() || 'Unable to generate study notes for this topic.';
+    const parsed = extractGeminiJsonOrThrow<{ title?: string; content?: string }>(
+      response,
+      'The AI model returned an empty study note.',
+    );
+    const content = (parsed.content || '').trim();
+    if (!content) {
+      throw new GeminiApiError(422, 'The AI model returned an empty study note body. Please try again.');
+    }
+
     const styleLabelMap: Record<string, string> = {
       simple: 'Simple Notes',
       detailed: 'Detailed Notes',
@@ -502,14 +676,14 @@ app.post('/api/tutor/generate-notes', async (req, res) => {
     };
 
     res.json({
-      title: `${lessonTitle || courseTitle || 'Course'} — ${styleLabelMap[style] || 'AI Study Note'}`,
+      title: parsed.title?.trim() || `${lessonTitle || courseTitle || 'Course'} — ${styleLabelMap[style] || 'AI Study Note'}`,
       content,
       noteMode: style,
       language: lang,
       isAiGenerated: true,
     });
   } catch (err: unknown) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to generate personal notes.' });
+    handleRouteError(res, err, 'Failed to generate personal study notes.');
   }
 });
 
@@ -568,6 +742,7 @@ app.post('/api/tutor/practice-quiz', async (req, res) => {
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
+        maxOutputTokens: 4096,
         responseSchema: {
           type: Type.ARRAY,
           items: {
@@ -589,14 +764,20 @@ app.post('/api/tutor/practice-quiz', async (req, res) => {
       },
     });
 
-    const parsed = JSON.parse(response.text || '[]') as Array<{
-      questionText: string;
-      options: string[];
-      correctIndex: number;
-      hint: string;
-      explanation: string;
-      topicTag: string;
-    }>;
+    const parsed = extractGeminiJsonOrThrow<
+      Array<{
+        questionText: string;
+        options: string[];
+        correctIndex: number;
+        hint: string;
+        explanation: string;
+        topicTag: string;
+      }>
+    >(response, 'Could not generate practice questions from the AI model.');
+
+    if (!Array.isArray(parsed)) {
+      throw new GeminiApiError(422, 'Practice quiz response did not match expected question list format.');
+    }
 
     const normalized = parsed
       .filter((q) => q.questionText && Array.isArray(q.options) && q.options.length >= 2)
@@ -611,9 +792,13 @@ app.post('/api/tutor/practice-quiz', async (req, res) => {
         topicTag: q.topicTag || 'Core Concept',
       }));
 
+    if (normalized.length === 0) {
+      throw new GeminiApiError(422, 'No valid practice questions could be generated for this topic. Please try again.');
+    }
+
     res.json({ questions: normalized });
   } catch (err: unknown) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to create practice test.' });
+    handleRouteError(res, err, 'Unable to create practice test.');
   }
 });
 
@@ -744,35 +929,50 @@ app.post('/api/tutor/explain-pdf', async (req, res) => {
       contents: [{ role: 'user', parts }],
       config: {
         systemInstruction: 'You are the RM HEAVEN Document Study Tutor reading an authorized curriculum file for an enrolled student.',
+        maxOutputTokens: 4096,
       },
     });
 
+    const explanation = ensureGeminiTextOrThrow(
+      response,
+      'Unable to extract an explanation from this document.',
+    );
+
     res.json({
-      explanation: response.text ?? 'Unable to extract an explanation from this document.',
+      explanation,
       materialTitle: matTitle,
       action: chosenAction,
       language: lang,
     });
   } catch (err: unknown) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to analyze course PDF.' });
+    handleRouteError(res, err, 'Unable to analyze course PDF.');
   }
 });
 
 // -----------------------------------------------------------------------------
 // RM HEAVEN Admin Helper: Draft Structured 11-Section Study Note JSON
 // -----------------------------------------------------------------------------
-app.post('/api/tutor/admin-draft-note', async (req, res) => {
+async function handleAdminGenerateNotes(req: Request, res: Response) {
   try {
     const caller = await verifyCaller(req, res, { requireAdmin: true });
     if (!caller) return;
 
-    const { courseTitle, departmentName, lessonTitle, lessonSummary, lessonContent } = req.body as {
-      courseTitle?: string;
-      departmentName?: string;
-      lessonTitle?: string;
-      lessonSummary?: string;
-      lessonContent?: string;
-    };
+    if (!checkRateLimit(caller.uid, 'admin-generate', 20, 10 * 60 * 1000)) {
+      res.status(429).json({ error: 'Admin note generation rate limit reached (20 per 10 minutes). Please wait briefly.' });
+      return;
+    }
+
+    const { courseTitle, departmentName, lessonTitle, lessonSummary, lessonContent, noteStyle, language, customTopic } =
+      req.body as {
+        courseTitle?: string;
+        departmentName?: string;
+        lessonTitle?: string;
+        lessonSummary?: string;
+        lessonContent?: string;
+        noteStyle?: string;
+        language?: string;
+        customTopic?: string;
+      };
 
     if (!courseTitle || !lessonTitle) {
       res.status(400).json({ error: 'courseTitle and lessonTitle are required.' });
@@ -785,12 +985,15 @@ app.post('/api/tutor/admin-draft-note', async (req, res) => {
       return;
     }
 
+    const lang = (language || 'English').trim().slice(0, 60);
     const deptRule = buildDepartmentConstraint(departmentName, courseTitle);
     const prompt = [
-      `Draft a thorough 11-section RM HEAVEN Study Note JSON for Admin editorial review (this will be reviewed by an instructor before publishing).`,
+      `Draft a thorough 11-section RM HEAVEN Study Note JSON in ${lang} for Admin editorial review (this will be reviewed by an instructor before publishing).`,
       `Department: ${departmentName || 'General'}`,
       `Course: ${courseTitle}`,
       `Lesson Title: ${lessonTitle}`,
+      noteStyle ? `Requested Note Style: ${noteStyle.slice(0, 60)}` : '',
+      customTopic ? `Specific Sub-Topic Focus: ${customTopic.slice(0, 500)}` : '',
       lessonSummary ? `Summary: ${lessonSummary}` : '',
       lessonContent ? `Lesson Content:\n${lessonContent.slice(0, 4000)}` : '',
       deptRule,
@@ -802,7 +1005,10 @@ app.post('/api/tutor/admin-draft-note', async (req, res) => {
       model: AI_MODEL,
       contents: prompt,
       config: {
+        systemInstruction:
+          'You draft structured 11-section official RM HEAVEN study notes as valid JSON matching the schema. Write clear, accurate educational material.',
         responseMimeType: 'application/json',
+        maxOutputTokens: 8192,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -838,11 +1044,53 @@ app.post('/api/tutor/admin-draft-note', async (req, res) => {
       },
     });
 
-    const draft = JSON.parse(response.text || '{}') as Record<string, string>;
-    res.json({ draft });
+    const draft = extractGeminiJsonOrThrow<Record<string, string>>(
+      response,
+      'The AI model returned an empty study note draft.',
+    );
+    if (!draft || typeof draft !== 'object' || Object.keys(draft).length === 0) {
+      throw new GeminiApiError(422, 'The AI model returned an empty study note draft. Please try again.');
+    }
+
+    res.json({ draft, isAiGenerated: true });
   } catch (err: unknown) {
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to draft study note.' });
+    handleRouteError(res, err, 'Unable to generate study note draft.');
   }
+}
+
+app.post('/api/ai/admin/generate-notes', handleAdminGenerateNotes);
+app.post('/api/tutor/admin-draft-note', handleAdminGenerateNotes);
+
+// Ensure unmatched /api/* routes and Express body/middleware errors always return JSON
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Requested API endpoint was not found.' });
+});
+
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  if (req.path.startsWith('/api')) {
+    const bodyErr = err as { status?: number; type?: string; message?: string };
+    if (bodyErr?.type === 'entity.parse.failed') {
+      res.status(400).json({ error: 'Invalid JSON request body.' });
+      return;
+    }
+    if (bodyErr?.type === 'entity.too.large') {
+      res.status(413).json({ error: 'Request payload is too large.' });
+      return;
+    }
+    const status =
+      typeof bodyErr?.status === 'number' && bodyErr.status >= 400 && bodyErr.status < 600
+        ? bodyErr.status
+        : 500;
+    res.status(status).json({
+      error: err instanceof Error ? err.message : 'Unexpected server error.',
+    });
+    return;
+  }
+  next(err);
 });
 
 async function startServer() {

@@ -20,6 +20,7 @@ import {
   Code2,
 } from 'lucide-react';
 import { auth } from '../../firebase/config';
+import { fetchApiJson } from '../../utils/apiClient';
 import {
   createOrUpdateCourse,
   deleteCourse,
@@ -581,22 +582,24 @@ export function AdminCoursePanel({
       if (!token) {
         throw new Error('Authentication session expired. Please refresh or sign in again.');
       }
-      const resp = await fetch('/api/tutor/admin-draft-note', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      const data = await fetchApiJson<{ draft?: Record<string, string>; error?: string }>(
+        '/api/ai/admin/generate-notes',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            courseTitle: selectedCourse.title,
+            departmentName: selectedCourse.departmentName || selectedCourse.category,
+            lessonTitle: targetTitle,
+            lessonSummary: matchedLesson?.summary || selectedCourse.shortDescription,
+            lessonContent: matchedLesson?.contentBody || selectedCourse.fullDescription,
+          }),
         },
-        body: JSON.stringify({
-          courseTitle: selectedCourse.title,
-          departmentName: selectedCourse.departmentName || selectedCourse.category,
-          lessonTitle: targetTitle,
-          lessonSummary: matchedLesson?.summary || selectedCourse.shortDescription,
-          lessonContent: matchedLesson?.contentBody || selectedCourse.fullDescription,
-        }),
-      });
-      const data = (await resp.json()) as { draft?: Record<string, string>; error?: string };
-      if (!resp.ok || !data.draft) {
+      );
+      if (!data.draft) {
         throw new Error(data.error || 'Could not generate AI draft.');
       }
 
